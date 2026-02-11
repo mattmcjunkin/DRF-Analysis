@@ -1,12 +1,17 @@
 # Brisnet Race Predictor
 
 A Streamlit app for Brisnet-based race analysis to predict likely winners and inspect race/track trends.
+# DRF + Timeform US Race Predictor
+
+A Streamlit app for blending DRF Formulator-style inputs with Timeform US figures to predict likely winners and inspect race/track trends.
 
 ## Features
 
 - Upload a current race card and score each horse using:
   - Combined speed figures
   - Combined pace figures
+  - Combined speed (Timeform + DRF)
+  - Combined pace (Timeform + DRF)
   - Pedigree surface fit
   - Pedigree distance fit
   - Field-size pressure
@@ -18,6 +23,7 @@ A Streamlit app for Brisnet-based race analysis to predict likely winners and in
   - Dominant running styles
 - Supports Brisnet-style files: **`.DRF`, `.DR2`, `.DR3`, `.DR4`** (plus CSV for normalized/manual datasets).
 - Sidebar includes a **US track analyzer dropdown** with direct analyzer links per track (`?track=<CODE>`).
+- Upload **CSV or PDF** files for card and historical results.
 - Tune model weights directly from the sidebar.
 - Export scored card predictions as CSV.
 - Deploy-ready with both `Procfile` (PaaS) and `Dockerfile` (container deployments).
@@ -36,6 +42,10 @@ streamlit run app.py
 - The app attempts to parse Brisnet files as delimited text (comma/pipe/tab/semicolon), wide whitespace columns, or fixed-width text.
 - Column aliases are normalized into the app's required schema.
 - If your file export has very different field names/order, convert it to CSV using the required columns below.
+## PDF Support
+
+- PDF ingestion supports **text-based** PDFs where rows are delimiter-based (comma, pipe, tab, semicolon).
+- Scanned/image-only PDFs are not directly parseable without OCR pre-processing.
 
 ## Deploying
 
