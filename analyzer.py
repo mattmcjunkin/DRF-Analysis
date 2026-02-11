@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
@@ -37,6 +38,62 @@ REQUIRED_HISTORY_COLUMNS = {
 
 CACHE_ROOT = Path("data/track_cache")
 
+BRISNET_CARD_ALIASES = {
+    "date": ["date", "race_date", "racedate", "dt"],
+    "track": ["track", "track_code", "trk"],
+    "race_number": ["race_number", "race", "race_num", "raceno", "race#"],
+    "horse": ["horse", "horse_name", "name"],
+    "surface": ["surface", "surf"],
+    "distance": ["distance", "dist", "distance_furlongs"],
+    "field_size": ["field_size", "field", "fldsz"],
+    "timeform_speed": ["timeform_speed", "tf_speed", "speed_rating", "speed"],
+    "drf_speed": ["drf_speed", "bris_speed", "bris_speed", "speed_figure"],
+    "timeform_pace": ["timeform_pace", "tf_pace", "pace_rating", "pace"],
+    "drf_pace": ["drf_pace", "bris_pace", "pace_figure"],
+    "pedigree_surface_fit": ["pedigree_surface_fit", "surface_fit", "ped_surface_fit"],
+    "pedigree_distance_fit": ["pedigree_distance_fit", "distance_fit", "ped_distance_fit"],
+}
+
+BRISNET_HISTORY_ALIASES = {
+    "date": ["date", "race_date", "racedate", "dt"],
+    "track": ["track", "track_code", "trk"],
+    "race_number": ["race_number", "race", "race_num", "raceno", "race#"],
+    "surface": ["surface", "surf"],
+    "distance": ["distance", "dist", "distance_furlongs"],
+    "field_size": ["field_size", "field", "fldsz"],
+    "winner_speed": ["winner_speed", "win_speed", "speed", "speed_figure"],
+    "winner_pace": ["winner_pace", "win_pace", "pace", "pace_figure"],
+    "winner_running_style": ["winner_running_style", "run_style", "running_style", "style"],
+}
+
+BRISNET_POSITIONAL_CARD_COLUMNS = [
+    "date",
+    "track",
+    "race_number",
+    "horse",
+    "surface",
+    "distance",
+    "field_size",
+    "timeform_speed",
+    "drf_speed",
+    "timeform_pace",
+    "drf_pace",
+    "pedigree_surface_fit",
+    "pedigree_distance_fit",
+]
+
+BRISNET_POSITIONAL_HISTORY_COLUMNS = [
+    "date",
+    "track",
+    "race_number",
+    "surface",
+    "distance",
+    "field_size",
+    "winner_speed",
+    "winner_pace",
+    "winner_running_style",
+]
+
 
 @dataclass
 class ModelWeights:
@@ -54,6 +111,77 @@ def normalize_series(series: pd.Series) -> pd.Series:
     if pd.isna(min_val) or pd.isna(max_val) or max_val == min_val:
         return pd.Series(np.zeros(len(series)), index=series.index)
     return (series - min_val) / (max_val - min_val)
+
+
+def _normalize_column_name(value: str) -> str:
+    return "".join(ch for ch in str(value).strip().lower() if ch.isalnum() or ch == "_")
+
+
+def _rename_using_aliases(df: pd.DataFrame, aliases: Dict[str, List[str]]) -> pd.DataFrame:
+    normalized_to_original = {_normalize_column_name(col): col for col in df.columns}
+    renamed = df.copy()
+    for canonical, alias_list in aliases.items():
+        if canonical in renamed.columns:
+            continue
+        for alias in alias_list:
+            matched_col = normalized_to_original.get(_normalize_column_name(alias))
+            if matched_col and matched_col in renamed.columns:
+                renamed = renamed.rename(columns={matched_col: canonical})
+                break
+    return renamed
+
+
+def _apply_positional_schema(df: pd.DataFrame, target_columns: List[str]) -> pd.DataFrame:
+    if not df.columns.to_series().astype(str).str.startswith("Unnamed").all():
+        return df
+    if df.shape[1] < len(target_columns):
+        return df
+
+    renamed = df.copy()
+    renamed.columns = target_columns + [f"extra_{idx}" for idx in range(df.shape[1] - len(target_columns))]
+    return renamed
+
+
+def _read_brisnet_text(file_bytes: bytes) -> pd.DataFrame:
+    text = file_bytes.decode("utf-8", errors="ignore")
+    for sep in [",", "|", "\t", ";"]:
+        try:
+            parsed = pd.read_csv(io.StringIO(text), sep=sep)
+        except Exception:
+            continue
+        if parsed.shape[1] > 1:
+            return parsed
+
+    try:
+        whitespace_df = pd.read_csv(io.StringIO(text), sep=r"\s{2,}", engine="python")
+        if whitespace_df.shape[1] > 1:
+            return whitespace_df
+    except Exception:
+        pass
+
+    try:
+        fixed = pd.read_fwf(io.StringIO(text))
+        if fixed.shape[1] > 1:
+            return fixed
+    except Exception:
+        pass
+
+    return pd.DataFrame()
+
+
+def load_brisnet_file(file_bytes: bytes, extension: str, history: bool = False) -> pd.DataFrame:
+    parsed = _read_brisnet_text(file_bytes)
+    if parsed.empty:
+        return parsed
+
+    parsed.columns = [str(col).strip() for col in parsed.columns]
+
+    if history:
+        parsed = _apply_positional_schema(parsed, BRISNET_POSITIONAL_HISTORY_COLUMNS)
+        return _rename_using_aliases(parsed, BRISNET_HISTORY_ALIASES)
+
+    parsed = _apply_positional_schema(parsed, BRISNET_POSITIONAL_CARD_COLUMNS)
+    return _rename_using_aliases(parsed, BRISNET_CARD_ALIASES)
 
 
 def validate_card_columns(df: pd.DataFrame) -> List[str]:

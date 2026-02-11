@@ -1,3 +1,18 @@
+from pathlib import Path
+
+import pandas as pd
+
+import analyzer
+from analyzer import (
+    ModelWeights,
+    history_for_tracks,
+    load_brisnet_file,
+    sanitize_track_code,
+    score_races,
+    summarize_trends,
+    update_track_cache,
+    validate_history_columns,
+)
 import pandas as pd
 
 from analyzer import ModelWeights, score_races, summarize_trends, validate_history_columns
@@ -40,6 +55,7 @@ def _sample_card() -> pd.DataFrame:
     )
 
 
+def _sample_history(track: str = "SA") -> pd.DataFrame:
 def _sample_history() -> pd.DataFrame:
     return pd.DataFrame(
         [
@@ -97,3 +113,17 @@ def test_track_cache_isolated(tmp_path: Path):
         assert (analyzer.CACHE_ROOT / "BEL.csv").exists()
     finally:
         analyzer.CACHE_ROOT = original_cache_root
+
+
+def test_load_brisnet_card_file_from_pipe_text():
+    content = """date|track|race_number|horse|surface|distance|field_size|timeform_speed|drf_speed|timeform_pace|drf_pace|pedigree_surface_fit|pedigree_distance_fit\n2026-01-02|SA|1|A|Dirt|6|8|90|88|87|85|0.7|0.6\n"""
+    parsed = load_brisnet_file(content.encode("utf-8"), extension="drf", history=False)
+    assert not parsed.empty
+    assert set(["horse", "drf_speed", "timeform_speed"]).issubset(parsed.columns)
+
+
+def test_load_brisnet_history_file_aliases():
+    content = """race_date,track_code,race_num,surf,dist,field,win_speed,win_pace,run_style\n2026-01-01,BEL,5,Turf,8.5,10,92,88,closer\n"""
+    parsed = load_brisnet_file(content.encode("utf-8"), extension="dr3", history=True)
+    assert not parsed.empty
+    assert set(["date", "track", "race_number", "winner_speed", "winner_pace"]).issubset(parsed.columns)
