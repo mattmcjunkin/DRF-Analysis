@@ -11,10 +11,12 @@ A Streamlit app for blending DRF Formulator-style inputs with Timeform US figure
   - Pedigree distance fit
   - Field-size pressure
   - Historical trend bias from prior race results
+- **Per-track analyzer cache**: historical results are stored separately by track code in `data/track_cache/<TRACK>.csv` so trends never blend across tracks.
 - Upload prior-day historical results to detect:
   - Surface bias by track
   - Distance-bucket effects
   - Dominant running styles
+- Upload **CSV or PDF** files for card and historical results.
 - Tune model weights directly from the sidebar.
 - Export scored card predictions as CSV.
 - Deploy-ready with both `Procfile` (PaaS) and `Dockerfile` (container deployments).
@@ -27,6 +29,11 @@ source .venv/bin/activate
 pip install -r requirements.txt
 streamlit run app.py
 ```
+
+## PDF Support
+
+- PDF ingestion supports **text-based** PDFs where rows are delimiter-based (comma, pipe, tab, semicolon).
+- Scanned/image-only PDFs are not directly parseable without OCR pre-processing.
 
 ## Deploying
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
 import numpy as np
@@ -34,6 +35,8 @@ REQUIRED_HISTORY_COLUMNS = {
     "winner_pace",
 }
 
+CACHE_ROOT = Path("data/track_cache")
+
 
 @dataclass
 class ModelWeights:
@@ -61,6 +64,15 @@ def validate_history_columns(df: pd.DataFrame) -> List[str]:
     return sorted(REQUIRED_HISTORY_COLUMNS.difference(df.columns))
 
 
+def sanitize_track_code(track: str) -> str:
+    value = "".join(ch for ch in str(track).upper().strip() if ch.isalnum())
+    return value or "UNKNOWN"
+
+
+def _cache_file_for_track(track: str) -> Path:
+    return CACHE_ROOT / f"{sanitize_track_code(track)}.csv"
+
+
 def prepare_card(df: pd.DataFrame) -> pd.DataFrame:
     working = df.copy()
     working["date"] = pd.to_datetime(working["date"], errors="coerce")
@@ -83,7 +95,7 @@ def prepare_card(df: pd.DataFrame) -> pd.DataFrame:
     working["combined_speed"] = working[["timeform_speed", "drf_speed"]].mean(axis=1)
     working["combined_pace"] = working[["timeform_pace", "drf_pace"]].mean(axis=1)
     working["surface"] = working["surface"].astype(str).str.lower().str.strip()
-    working["track"] = working["track"].astype(str).str.upper().str.strip()
+    working["track"] = working["track"].astype(str).apply(sanitize_track_code)
 
     return working
 
@@ -97,7 +109,7 @@ def prepare_history(df: pd.DataFrame) -> pd.DataFrame:
         history[column] = pd.to_numeric(history[column], errors="coerce")
 
     history["surface"] = history["surface"].astype(str).str.lower().str.strip()
-    history["track"] = history["track"].astype(str).str.upper().str.strip()
+    history["track"] = history["track"].astype(str).apply(sanitize_track_code)
     history = history.dropna(
         subset=["date", "track", "race_number", "surface", "distance", "winner_speed", "winner_pace"]
     )
@@ -110,6 +122,50 @@ def prepare_history(df: pd.DataFrame) -> pd.DataFrame:
         )
 
     return history
+
+
+def load_track_cache(track: str) -> pd.DataFrame:
+    path = _cache_file_for_track(track)
+    if not path.exists():
+        return pd.DataFrame(columns=sorted(REQUIRED_HISTORY_COLUMNS | {"winner_running_style"}))
+
+    cached = pd.read_csv(path)
+    return prepare_history(cached)
+
+
+def update_track_cache(history_df: pd.DataFrame) -> None:
+    prepared = prepare_history(history_df)
+    if prepared.empty:
+        return
+
+    CACHE_ROOT.mkdir(parents=True, exist_ok=True)
+    for track, chunk in prepared.groupby("track"):
+        cache_path = _cache_file_for_track(track)
+        if cache_path.exists():
+            existing = prepare_history(pd.read_csv(cache_path))
+            merged = pd.concat([existing, chunk], ignore_index=True)
+        else:
+            merged = chunk.copy()
+
+        merged = merged.drop_duplicates(
+            subset=["date", "track", "race_number", "surface", "distance", "winner_speed", "winner_pace"]
+        ).sort_values(["date", "race_number"])
+
+        merged.to_csv(cache_path, index=False)
+
+
+def history_for_tracks(card_df: pd.DataFrame, uploaded_history: Optional[pd.DataFrame]) -> pd.DataFrame:
+    prepared_card = prepare_card(card_df)
+    tracks = prepared_card["track"].dropna().unique().tolist()
+
+    cached_frames = [load_track_cache(track) for track in tracks]
+    cached = pd.concat(cached_frames, ignore_index=True) if cached_frames else pd.DataFrame()
+
+    if uploaded_history is None or uploaded_history.empty:
+        return cached
+
+    prepared_upload = prepare_history(uploaded_history)
+    return pd.concat([cached, prepared_upload], ignore_index=True).drop_duplicates()
 
 
 def summarize_trends(history_results: pd.DataFrame) -> Dict[str, pd.DataFrame]:

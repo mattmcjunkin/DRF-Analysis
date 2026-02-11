@@ -45,7 +45,7 @@ def _sample_history() -> pd.DataFrame:
         [
             {
                 "date": "2025-12-31",
-                "track": "SA",
+                "track": track,
                 "race_number": 1,
                 "surface": "Dirt",
                 "distance": 6,
@@ -75,3 +75,25 @@ def test_summarize_trends_returns_expected_keys():
     trends = summarize_trends(_sample_history())
     assert set(trends.keys()) == {"surface_bias", "distance_buckets", "pace_shape"}
     assert not trends["surface_bias"].empty
+
+
+def test_sanitize_track_code():
+    assert sanitize_track_code(" sa-") == "SA"
+
+
+def test_track_cache_isolated(tmp_path: Path):
+    original_cache_root = analyzer.CACHE_ROOT
+    analyzer.CACHE_ROOT = tmp_path / "track_cache"
+    try:
+        update_track_cache(_sample_history("SA"))
+        update_track_cache(_sample_history("BEL"))
+
+        card = _sample_card()
+        card["track"] = "SA"
+        history = history_for_tracks(card, None)
+
+        assert set(history["track"].unique()) == {"SA"}
+        assert (analyzer.CACHE_ROOT / "SA.csv").exists()
+        assert (analyzer.CACHE_ROOT / "BEL.csv").exists()
+    finally:
+        analyzer.CACHE_ROOT = original_cache_root
