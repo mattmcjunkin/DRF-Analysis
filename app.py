@@ -208,6 +208,10 @@ def main() -> None:
 
     st.subheader("2) Upload historical race results (optional but recommended)")
     st.caption("Brisnet history files can be .DR2/.DR3/.DR4 depending on export type")
+    history_display_columns = set(REQUIRED_HISTORY_COLUMNS)
+    history_display_columns.add("winner_running_style")
+    st.markdown("Expected columns:\n" + recommended_columns_text(history_display_columns))
+    history_file = st.file_uploader("Historical results file", type=["csv", "drf", "dr2", "dr3", "dr4"], key="history")
     st.markdown("Expected columns:\n" + recommended_columns_text(REQUIRED_HISTORY_COLUMNS | {"winner_running_style"}))
     history_file = st.file_uploader(
         "Historical results file", type=["csv", "drf", "dr2", "dr3", "dr4"], key="history"
@@ -275,6 +279,21 @@ def main() -> None:
         return
 
     st.subheader("Predictions")
+    prediction_columns = [
+        "date",
+        "track",
+        "race_number",
+        "horse",
+        "surface",
+        "distance",
+        "field_size",
+        "combined_speed",
+        "combined_pace",
+        "prediction_score",
+        "win_probability",
+        "predicted_rank",
+    ]
+    st.dataframe(scored[prediction_columns], use_container_width=True, hide_index=True)
     st.dataframe(
         scored[
             [
