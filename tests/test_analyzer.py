@@ -13,6 +13,9 @@ from analyzer import (
     update_track_cache,
     validate_history_columns,
 )
+import pandas as pd
+
+from analyzer import ModelWeights, score_races, summarize_trends, validate_history_columns
 
 
 def _sample_card() -> pd.DataFrame:
@@ -53,6 +56,7 @@ def _sample_card() -> pd.DataFrame:
 
 
 def _sample_history(track: str = "SA") -> pd.DataFrame:
+def _sample_history() -> pd.DataFrame:
     return pd.DataFrame(
         [
             {
