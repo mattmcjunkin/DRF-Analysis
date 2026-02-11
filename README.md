@@ -1,0 +1,89 @@
+# Brisnet Race Predictor
+
+A Streamlit app for Brisnet-based race analysis to predict likely winners and inspect race/track trends.
+
+## Features
+
+- Upload a current race card and score each horse using:
+  - Combined speed figures
+  - Combined pace figures
+  - Pedigree surface fit
+  - Pedigree distance fit
+  - Field-size pressure
+  - Historical trend bias from prior race results
+- **Per-track analyzer cache**: historical results are stored separately by track code in `data/track_cache/<TRACK>.csv` so trends never blend across tracks.
+- Upload prior-day historical results to detect:
+  - Surface bias by track
+  - Distance-bucket effects
+  - Dominant running styles
+- Supports Brisnet-style files: **`.DRF`, `.DR2`, `.DR3`, `.DR4`** (plus CSV for normalized/manual datasets).
+- Sidebar includes a **US track analyzer dropdown** with direct analyzer links per track (`?track=<CODE>`).
+- Tune model weights directly from the sidebar.
+- Export scored card predictions as CSV.
+- Deploy-ready with both `Procfile` (PaaS) and `Dockerfile` (container deployments).
+
+## Local Quickstart
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+## Brisnet File Support
+
+- The app attempts to parse Brisnet files as delimited text (comma/pipe/tab/semicolon), wide whitespace columns, or fixed-width text.
+- Column aliases are normalized into the app's required schema.
+- If your file export has very different field names/order, convert it to CSV using the required columns below.
+
+## Deploying
+
+### Option 1: PaaS (Render/Railway/Heroku-style)
+
+This repository includes a `Procfile` that starts Streamlit on the platform-provided `PORT`:
+
+```text
+web: sh -c 'streamlit run app.py --server.port ${PORT:-8501} --server.address 0.0.0.0'
+```
+
+### Option 2: Docker
+
+```bash
+docker build -t drf-analysis .
+docker run --rm -p 8501:8501 drf-analysis
+```
+
+Open http://localhost:8501.
+
+## Required card columns
+
+- `date`
+- `track`
+- `race_number`
+- `horse`
+- `surface`
+- `distance`
+- `field_size`
+- `timeform_speed`
+- `drf_speed`
+- `timeform_pace`
+- `drf_pace`
+- `pedigree_surface_fit`
+- `pedigree_distance_fit`
+
+## Required history columns
+
+- `date`
+- `track`
+- `race_number`
+- `surface`
+- `distance`
+- `field_size`
+- `winner_speed`
+- `winner_pace`
+- `winner_running_style` (optional; defaults to `unknown` if omitted)
+
+## Notes
+
+This is a decision-support model, not wagering advice. The quality of predictions depends on input quality and calibration of the selected weights.
