@@ -145,6 +145,8 @@ def _selected_track_from_sidebar() -> str:
 def main() -> None:
     st.set_page_config(page_title="Brisnet Race Analyzer", layout="wide")
     st.title("🏇 Brisnet Race Card Analyzer")
+    st.caption("Upload Brisnet data files plus historical results to generate winner predictions and detect track/race-shape trends.")
+    st.info("Supported Brisnet file types: .DRF, .DR2, .DR3, .DR4. CSV uploads are also accepted for normalized/manual datasets.")
     st.caption(
         "Upload Brisnet data files plus historical results to generate winner predictions and detect track/race-shape trends."
     )
